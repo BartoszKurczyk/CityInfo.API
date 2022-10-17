@@ -7,7 +7,7 @@ namespace CityInfo.API.Services
 {
     public class CityInfoRepository:ICityInfoRepository
     {
-        private CityInfoContext _context;
+        private readonly CityInfoContext _context;
 
         public CityInfoRepository(CityInfoContext context)
         {
@@ -61,6 +61,32 @@ namespace CityInfo.API.Services
         public void DeletePointOfInterest(PointOfInterest pointOfInterest)
         {
             _context.PointsOfInterest.Remove(pointOfInterest);
+        }
+
+        public async Task<(IEnumerable<City>,PaginationMetadata)> GetCitiesAsync(string? name, string? searchQuery, int pageNumber, int pageSize)
+        {
+            var collection = _context.Cities as IQueryable<City>;
+
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                name = name.Trim();
+                collection = collection.Where(x => x.Name == name);
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchQuery))
+            {
+                searchQuery = searchQuery.Trim();
+                collection = collection.Where(x =>
+                    x.Name.Contains(searchQuery) || (x.Description != null && x.Description.Contains(searchQuery)));
+            }
+
+            var totalItemCount = await collection.CountAsync();
+
+            var paginationMetadata = new PaginationMetadata(totalItemCount, pageSize, pageNumber);
+
+            var collectionToReturn = await collection.OrderBy(x => x.Name).Skip(pageSize*(pageNumber-1)).Take(pageSize).ToListAsync();
+
+            return (collectionToReturn, paginationMetadata);
         }
     }
 }
